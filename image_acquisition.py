@@ -3,25 +3,9 @@ import numpy as np
 
 import time
 
+# TODO: feature fusion? using NN Autoencoders?
+# TODO: Texture matching coefficient
 
-video = cv2.VideoCapture(0)
-
-us = 0
-begin = time.time()
-
-abs_mean = 0
-
-def preprocess(img):
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-
-    # res_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    res_img = img / 255.
-    for i in range(3):
-        res_img[i, :, :] = (res_img[i, :, :] - mean[i]) / std[i]
-    res_img = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 10, 8)
-    return res_img
 
 def get_features(img):
     # hu moments
@@ -41,25 +25,32 @@ def get_features(img):
 
     return {"hu": hu_moments, "orb": orb_descriptors, "means": means_vec}
 
-while True:
+if __name__ == "__main__":
 
-    us = us + 1
+    video = cv2.VideoCapture(0)
 
-    check, frame = video.read()
+    us = 0
+    begin = time.time()
 
-    proc_frame = preprocess(frame)
+    while True:
 
-    cv2.imshow("Capture", proc_frame)
+        us = us + 1
 
-    print(get_features(proc_frame))
+        check, frame = video.read()
 
-    key = cv2.waitKey(1)
-    if key == ord("q"):
-        break
-dt = time.time() - begin
+        proc_frame = preprocess(frame)
 
-print(f"{us} frames elapsed in {dt} seconds")
-video.release()
-cv2.destroyAllWindows()
-print("All is good, bye")
+        cv2.imshow("Capture", proc_frame)
+
+        print(get_features(proc_frame))
+
+        key = cv2.waitKey(1)
+        if key == ord("q"):
+            break
+    dt = time.time() - begin
+
+    print(f"{us} frames elapsed in {dt} seconds")
+    video.release()
+    cv2.destroyAllWindows()
+    print("All is good, bye")
 
