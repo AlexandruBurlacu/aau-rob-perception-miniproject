@@ -36,9 +36,8 @@ def get_features(img):
     means_vec = [img_mean, mean_r, mean_g, mean_b]
 
     # orb # debug it
-    orb = cv2.ORB()
-    kp = orb.detect(bw_image, None)
-    kp, orb_descriptors = orb.compute(bw_image, kp)
+    orb = cv2.ORB_create()
+    kp, orb_descriptors = orb.detectAndCompute(bw_image, None)
 
     return {"hu": hu_moments, "orb": orb_descriptors, "means": means_vec}
 
