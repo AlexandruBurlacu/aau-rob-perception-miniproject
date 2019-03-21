@@ -1,5 +1,6 @@
 numpy # for linear algebra
 opencv-python # you know what that is
+opencv-contrib-python
 matplotlib # data visualizations
 scipy # all sorts of scientific computing
 scikit-learn # machine learning, yay!
