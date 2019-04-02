@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pickle
 
 import time
 
@@ -20,71 +21,76 @@ def get_features(img, orb):
 
     return orb_descriptors
 
-def get_flann():
+def get_matcher():
     FLANN_INDEX_KDTREE = 0
     index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
     search_params = dict(checks=50)   # or pass empty dictionary
 
-    flann = cv2.FlannBasedMatcher(index_params,search_params)
+    flann = cv2.BFMatcher_create() # index_params, search_params
 
     return flann
 
 def match_classify(matcher, lookup_store, desc):
+    MIN_MATCH_COUNT = 5
     # TODO: figure out how to find if image matches and is a known fruit
-    for possible_match_desc in lookup_store:
-        matches = flann.knnMatch(desc, possible_match_desc, k=2)
+    for possible_match_desc, class_t in lookup_store:
+        matches = matcher.knnMatch(desc, possible_match_desc, k=2)
 
-        # Need to draw only good matches, so create a mask
-        matchesMask = [[0,0] for i in xrange(len(matches))]
-
-        # ratio test as per Lowe's paper
-        for i, (m, n) in enumerate(matches):
-            if m.distance < 0.7 * n.distance:
-                matchesMask[i] = [1, 0]
+        good_matches = [m[0] for m in matches
+                        if len(m) == 2 and m[0].distance < m[1].distance * 0.75]
+        
+        if len(good_matches) > MIN_MATCH_COUNT:
+            return True, class_t        
 
     return False, "undefined"
 
-def load_lookup_store():
-    return None
+def load_lookup_store(fpath="lookup.db"):
+    with open(fpath, "rb") as fptr:
+        features = pickle.load(fptr)
 
-lookup_store = load_lookup_store()
-orb = cv2.ORB_create()
-flann = get_flann()
-video = cv2.VideoCapture(0)
+    return features
 
-us = 0
-begin = time.time()
 
-abs_mean = 0
+if __name__ == "__main__":
+    
+    lookup_store = load_lookup_store()
+    orb = cv2.ORB_create()
+    flann = get_matcher()
+    video = cv2.VideoCapture(0)
 
-while True:
+    us = 0
+    begin = time.time()
 
-    us = us + 1
+    abs_mean = 0
 
-    check, frame = video.read()
+    while True:
 
-    proc_frame = preprocess(frame)
+        us = us + 1
 
-    cv2.imshow("Capture", proc_frame)
+        check, frame = video.read()
 
-    segments = get_segments(proc_frame, sbd)
+        proc_frame = preprocess(frame)
 
-    for blob in segments:
-        feature = get_features(blob, orb)
-        is_match, class_t = match_classify(flann, lookup_store, feature)
-        if is_match:
-            print(class_t)
+        cv2.imshow("Capture", proc_frame)
 
-    # TODO: visualize the matched objects on the whole image
+        segments = get_segments(proc_frame, None)
 
-    key = cv2.waitKey(1)
-    if key == ord("q"):
-        break
+        for idx, blob in enumerate(segments):
+            feature = get_features(blob, orb)
+            is_match, class_t = match_classify(flann, lookup_store, feature)
+            if is_match:
+                print(f"At frame #{us} blob #{idx} is a {class_t}")
 
-dt = time.time() - begin
+        # TODO: visualize the matched objects on the whole image
 
-print(f"{us} frames elapsed in {dt} seconds")
-video.release()
-cv2.destroyAllWindows()
-print("All is good, bye")
+        key = cv2.waitKey(1)
+        if key == ord("q"):
+            break
+
+    dt = time.time() - begin
+
+    print(f"{us} frames elapsed in {dt} seconds")
+    video.release()
+    cv2.destroyAllWindows()
+    print("All is good, bye")
 
