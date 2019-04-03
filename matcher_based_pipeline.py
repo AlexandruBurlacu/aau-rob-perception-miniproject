@@ -10,9 +10,9 @@ def preprocess(img):
     return res_img
 
 
-def viewImage(image):
-    cv2.namedWindow('Display', cv2.WINDOW_NORMAL)
-    cv2.imshow('Display', image)
+def viewImage(image, title):
+    cv2.namedWindow(title, cv2.WINDOW_NORMAL)
+    cv2.imshow(title, image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -47,8 +47,9 @@ def get_segments(img, detector):
         kernel = np.ones((5,5), np.uint8)
         closing = cv2.morphologyEx(threshold, cv2.MORPH_CLOSE, kernel)
         mask = cv2.morphologyEx(closing, cv2.MORPH_OPEN, kernel)
+        masked = cv2.bitwise_and(img, img, mask=mask)
 
-        imgs.append(cv2.bitwise_and(img, img, mask=mask))
+        imgs.append(masked)
 
     return imgs
 
