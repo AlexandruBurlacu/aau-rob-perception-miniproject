@@ -10,9 +10,48 @@ def preprocess(img):
     return res_img
 
 
+def viewImage(image):
+    cv2.namedWindow('Display', cv2.WINDOW_NORMAL)
+    cv2.imshow('Display', image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
 def get_segments(img, detector):
-    bw_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return [img]
+    hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    red_low1 = np.array([0, 100, 100])
+    red_high1 = np.array([10, 255, 255])
+
+    red_low2 = np.array([165, 100, 100])
+    red_high2 = np.array([179, 255, 255])
+
+    yellow_low = np.array([20, 100, 100])
+    yellow_high = np.array([30, 255, 255])
+
+    green_low = np.array([45 , 100, 100])
+    green_high = np.array([75, 255, 255])
+
+    imgs = []
+
+    for lo, hi in (red_low1, red_high1), (red_low2, red_high2), (green_low, green_high), (yellow_low, yellow_high):
+
+        curr_mask = cv2.inRange(hsv_img, lo, hi)
+        hsv_img[curr_mask > 0] = (hi,)
+
+        RGB_again = cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
+        gray = cv2.cvtColor(RGB_again, cv2.COLOR_RGB2GRAY)
+
+        ret, threshold = cv2.threshold(gray, 90, 255, 0)
+
+        kernel = np.ones((5,5), np.uint8)
+        closing = cv2.morphologyEx(threshold, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(closing, cv2.MORPH_OPEN, kernel)
+
+        imgs.append(cv2.bitwise_and(img, img, mask=mask))
+
+    return imgs
+
 
 def get_features(img, orb):
     # ORB
@@ -21,28 +60,26 @@ def get_features(img, orb):
 
     return orb_descriptors
 
+
 def get_matcher():
-    FLANN_INDEX_KDTREE = 0
-    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-    search_params = dict(checks=50)   # or pass empty dictionary
+    matcher = cv2.BFMatcher_create(cv2.NORM_HAMMING, crossCheck=True)
 
-    flann = cv2.BFMatcher_create() # index_params, search_params
+    return matcher
 
-    return flann
 
 def match_classify(matcher, lookup_store, desc):
     MIN_MATCH_COUNT = 5
-    # TODO: figure out how to find if image matches and is a known fruit
     for possible_match_desc, class_t in lookup_store:
-        matches = matcher.knnMatch(desc, possible_match_desc, k=2)
+        matches = matcher.match(desc, possible_match_desc)
 
-        good_matches = [m[0] for m in matches
-                        if len(m) == 2 and m[0].distance < m[1].distance * 0.75]
-        
+        good_matches = [m for m in matches
+                        if m.distance < 0.7]
+         
         if len(good_matches) > MIN_MATCH_COUNT:
-            return True, class_t        
+            return True, class_t
 
     return False, "undefined"
+
 
 def load_lookup_store(fpath="lookup.db"):
     with open(fpath, "rb") as fptr:
@@ -55,17 +92,15 @@ if __name__ == "__main__":
     
     lookup_store = load_lookup_store()
     orb = cv2.ORB_create()
-    flann = get_matcher()
+    matcher = get_matcher()
     video = cv2.VideoCapture(0)
 
-    us = 0
+    iters = 0
     begin = time.time()
-
-    abs_mean = 0
 
     while True:
 
-        us = us + 1
+        iters += 1
 
         check, frame = video.read()
 
@@ -77,9 +112,9 @@ if __name__ == "__main__":
 
         for idx, blob in enumerate(segments):
             feature = get_features(blob, orb)
-            is_match, class_t = match_classify(flann, lookup_store, feature)
+            is_match, class_t = match_classify(matcher, lookup_store, feature)
             if is_match:
-                print(f"At frame #{us} blob #{idx} is a {class_t}")
+                print(f"At frame #{iters} blob #{idx} is a {class_t}")
 
         # TODO: visualize the matched objects on the whole image
 
@@ -89,7 +124,7 @@ if __name__ == "__main__":
 
     dt = time.time() - begin
 
-    print(f"{us} frames elapsed in {dt} seconds")
+    print(f"{iters} frames elapsed in {dt} seconds")
     video.release()
     cv2.destroyAllWindows()
     print("All is good, bye")
